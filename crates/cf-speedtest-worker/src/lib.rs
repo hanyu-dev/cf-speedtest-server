@@ -12,7 +12,7 @@ use worker::worker_sys::ext::ResponseInitExt;
 use worker::{Context, Env, Result, event};
 
 /// Route prefix for the speedtest worker.
-const WORKER_ROUTE_PREFIX: &str = "/cf-speedtest";
+const WORKER_ROUTE_PREFIX: &str = "/speedtest";
 
 /// If missing bytes indication, or invalid, assume 100 MiB.
 const DEFAULT_BYTES: NonZeroU64 = NonZeroU64::new(100 * 1024 * 1024).unwrap();
@@ -80,13 +80,13 @@ thread_local! {
 
         headers
             .append("x-server", cf_speedtest_core::VERSION)
-            .expect("Failed to append x-server header");
+            .expect("Failed to append `x-server` header");
         headers
             .append("content-type", "application/octet-stream")
-            .expect("Failed to append content-type header");
+            .expect("Failed to append `content-type` header");
         headers
             .append("content-encoding", cf_speedtest_core::CONTENT_ENCODING)
-            .expect("Failed to append content-encoding header");
+            .expect("Failed to append `content-encoding` header");
 
         let mut init = ResponseInit::new();
         init.set_status(200);
