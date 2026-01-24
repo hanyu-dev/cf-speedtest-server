@@ -1,6 +1,10 @@
 //! Get git infos
 
-use std::{env, fs::File, io::Write, path::Path, process::Command};
+use std::env;
+use std::fs::File;
+use std::io::Write;
+use std::path::Path;
+use std::process::Command;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let main_version = env!("CARGO_PKG_VERSION");

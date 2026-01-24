@@ -1,5 +1,5 @@
 [package]
-name = "cf-speedtest-backend"
+name = "cf-speedtest"
 version.workspace = true
 edition.workspace = true
 authors.workspace = true
@@ -7,7 +7,7 @@ license.workspace = true
 
 [dependencies]
 axum = { version = "0.7", default-features = false, features = ["http1", "tokio"] }
-cf-speedtest-v2 = { path = "../" }
+cf-speedtest-core = { path = "../cf-speedtest-core" }
 dashmap = { version = "6.1.0", features = ["inline"] }
 foldhash = "0.1.3"
 macro-toolset = { version = "0.3", default-features = false }

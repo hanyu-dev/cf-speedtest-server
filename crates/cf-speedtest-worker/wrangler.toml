@@ -1,4 +1,4 @@
-name = "cf-speedtest-v2"
+name = "cf-speedtest-worker"
 main = "build/index.js"
 compatibility_date = "2026-01-24"
 
@@ -10,4 +10,4 @@ enabled = true
 head_sampling_rate = 1
 
 [build]
-command = "cargo install -q worker-build && worker-build --release --package cf-speedtest-v2"
+command = "RUSTFLAGS=\"-Zfmt-debug=none -Zfmt-debug=none\" worker-build --profile release-wasm"

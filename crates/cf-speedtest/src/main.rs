@@ -1,14 +1,13 @@
 //! Binary entrypoint for the cf-speedtest-v2 project.
 
-use std::{env, net::SocketAddr, sync::LazyLock};
+use std::env;
+use std::net::SocketAddr;
+use std::sync::LazyLock;
 
-use axum::{
-    extract::Request,
-    http::{
-        header::{CACHE_CONTROL, CONTENT_ENCODING, CONTENT_TYPE}, HeaderMap, HeaderName, HeaderValue, StatusCode
-    },
-    response::{IntoResponse, Response},
-};
+use axum::extract::Request;
+use axum::http::header::{CACHE_CONTROL, CONTENT_ENCODING, CONTENT_TYPE};
+use axum::http::{HeaderMap, HeaderName, HeaderValue, StatusCode};
+use axum::response::{IntoResponse, Response};
 use dashmap::DashMap;
 use macro_toolset::init_tracing_simple;
 use tokio::net::TcpListener;
@@ -21,7 +20,7 @@ use tokio::net::TcpListener;
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     init_tracing_simple!();
 
-    tracing::info!("Starting server, version: {}", cf_speedtest_v2::VERSION);
+    tracing::info!("Starting server, version: {}", cf_speedtest_core::VERSION);
 
     let listen: SocketAddr = env::var("CF_SPEEDTEST_LISTEN")
         .unwrap_or_else(|_| {
@@ -72,45 +71,46 @@ async fn handler(request: Request) -> Response {
 
     let path = request.uri().path();
 
-    let (body, headers) = if let Some(value) = CACHE.get(path) {
-        (value.0, *value.1.clone())
-    } else {
-        tracing::debug!("Cache miss, create new one.");
+    let (body, headers) = match CACHE.get(path) {
+        Some(value) => (value.0, *value.1.clone()),
+        _ => {
+            tracing::debug!("Cache miss, create new one.");
 
-        let body = match cf_speedtest_v2::body(path) {
-            Some(body) => body,
-            None => {
-                tracing::warn!("Invalid path: {}", path);
+            let body = match cf_speedtest_core::body(path) {
+                Some(body) => body,
+                None => {
+                    tracing::warn!("Invalid path: {}", path);
 
-                return StatusCode::NOT_FOUND.into_response();
+                    return StatusCode::NOT_FOUND.into_response();
+                }
+            };
+
+            // Make compiler happy here: `: HeaderMap`
+            let headers: HeaderMap = [
+                (
+                    CACHE_CONTROL,
+                    HeaderValue::from_static("public, max-age=31536000"),
+                ),
+                (CONTENT_TYPE, HeaderValue::from_static("text/plain")),
+                (CONTENT_ENCODING, HeaderValue::from_static("br")),
+                (
+                    HeaderName::from_static("x-server"),
+                    HeaderValue::from_static(cf_speedtest_core::VERSION),
+                ),
+            ]
+            .into_iter()
+            .collect();
+
+            {
+                let path = path.to_string();
+                let headers = Box::new(headers.clone());
+                tokio::spawn(async move {
+                    CACHE.insert(path, (body, headers));
+                });
             }
-        };
 
-        // Make compiler happy here: `: HeaderMap`
-        let headers: HeaderMap = [
-            (
-                CACHE_CONTROL,
-                HeaderValue::from_static("public, max-age=31536000"),
-            ),
-            (CONTENT_TYPE, HeaderValue::from_static("text/plain")),
-            (CONTENT_ENCODING, HeaderValue::from_static("br")),
-            (
-                HeaderName::from_static("x-server"),
-                HeaderValue::from_static(cf_speedtest_v2::VERSION),
-            ),
-        ]
-        .into_iter()
-        .collect();
-
-        {
-            let path = path.to_string();
-            let headers = Box::new(headers.clone());
-            tokio::spawn(async move {
-                CACHE.insert(path, (body, headers));
-            });
+            (body, headers)
         }
-
-        (body, headers)
     };
 
     let mut response = Response::new(body.into());
