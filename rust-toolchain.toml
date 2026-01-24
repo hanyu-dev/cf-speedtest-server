@@ -1,5 +1,5 @@
 [toolchain]
-channel = "1.81.0" # See https://github.com/cloudflare/workers-rs/issues/658
+channel = "nightly"
 components = ["rustfmt"]
 targets = ["wasm32-unknown-unknown"]
 profile = "minimal"
