@@ -1,6 +1,6 @@
 name = "cf-speedtest-v2"
-main = "build/worker/shim.mjs"
-compatibility_date = "2024-11-10"
+main = "build/index.js"
+compatibility_date = "2026-01-24"
 
 # Disable `workers.dev` domain
 workers_dev = false
