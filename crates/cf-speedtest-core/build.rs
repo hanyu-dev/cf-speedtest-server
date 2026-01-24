@@ -7,6 +7,8 @@ use std::path::Path;
 use std::process::Command;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
+    println!("cargo:rerun-if-changed=../../crates");
+
     let main_version = env!("CARGO_PKG_VERSION");
     let branch = Command::new("git")
         .args(["branch", "--show-current"])

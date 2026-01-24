@@ -14,8 +14,8 @@ use worker::{Context, Env, Result, event};
 /// Route prefix for the speedtest worker.
 const WORKER_ROUTE_PREFIX: &str = "/speedtest";
 
-/// If missing bytes indication, or invalid, assume 100 MiB.
-const DEFAULT_BYTES: NonZeroU64 = NonZeroU64::new(100 * 1024 * 1024).unwrap();
+/// If missing bytes indication, or invalid, assume 200 MiB.
+const DEFAULT_BYTES: NonZeroU64 = NonZeroU64::new(200 * 1024 * 1024).unwrap();
 
 /// Maximum bytes allowed to be requested.
 ///
