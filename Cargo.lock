@@ -135,7 +135,6 @@ dependencies = [
  "fluent-uri",
  "foldhash 0.2.0",
  "worker",
- "worker-macros",
 ]
 
 [[package]]
