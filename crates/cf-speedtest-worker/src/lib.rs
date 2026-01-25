@@ -6,11 +6,9 @@ use std::collections::HashMap;
 use std::io;
 use std::num::NonZeroU64;
 
-use worker::js_sys::{Reflect, Uint8Array};
-use worker::wasm_bindgen::JsValue;
+use worker::js_sys::Uint8Array;
 use worker::web_sys::{Headers, Request, Response, ResponseInit};
-use worker::worker_sys::ext::{RequestExt, ResponseInitExt};
-use worker::worker_sys::types::IncomingRequestCfProperties;
+use worker::worker_sys::ext::ResponseInitExt;
 use worker::{Context, Env, Result, event};
 
 /// Route prefix for the speedtest worker.
@@ -39,46 +37,6 @@ async fn fetch(req: Request, _env: Env, _ctx: Context) -> Result<Response> {
         _ => {
             return build_general_response(None, 405);
         }
-    }
-
-    let cf = req.cf();
-
-    // Filter Accept-Encoding header.
-    if let Some(ret) = || -> Option<Result<Response, worker::Error>> {
-        let enc;
-
-        macro_rules! ret {
-            ($($ret:tt)+) => {{
-                match $($ret)+ {
-                    Ok(ret) => ret,
-                    Err(e) => return Some(Err(e.into())),
-                }
-            }};
-        }
-
-        if let Some(client_accept_encoding) = ret!(get_client_accept_encoding(cf.as_ref())) {
-            enc = client_accept_encoding
-        } else if let Some(accept_encoding) = ret!(req.headers().get("accept-encoding")) {
-            enc = accept_encoding
-        } else {
-            return None;
-        }
-
-        enc.rsplit(',')
-            .map(|enc| enc.trim())
-            .find(|enc| enc.eq_ignore_ascii_case(cf_speedtest_core::CONTENT_ENCODING))
-            .map(|_| {
-                build_general_response(
-                    Some(constcat::concat!(
-                        "The client should not accept encoding `",
-                        cf_speedtest_core::CONTENT_ENCODING,
-                        "`"
-                    )),
-                    406,
-                )
-            })
-    }() {
-        return ret;
     }
 
     let uri = req.url();
@@ -183,26 +141,4 @@ fn build_general_response(message: Option<&str>, status: u16) -> Result<Response
     init.set_headers(&headers);
 
     Response::new_with_opt_str_and_init(message, &init).map_err(Into::into)
-}
-
-fn get_client_accept_encoding(
-    obj: Option<&IncomingRequestCfProperties>,
-) -> Result<Option<String>, JsValue> {
-    let obj = match obj {
-        Some(obj) => obj,
-        None => return Ok(None),
-    };
-
-    let value = Reflect::get(obj, &JsValue::from_str("clientAcceptEncoding"))?;
-
-    if value.is_undefined() || value.is_null() {
-        Ok(None)
-    } else {
-        value
-            .as_string()
-            .ok_or_else(|| {
-                JsValue::from_str("Failed to convert `clientAcceptEncoding` property to String")
-            })
-            .map(Some)
-    }
 }
