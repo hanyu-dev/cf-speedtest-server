@@ -26,6 +26,11 @@ const MAX_BYTES: NonZeroU64 = NonZeroU64::new(10 * 1024 * 1024 * 1024).unwrap();
 async fn fetch(req: Request, _env: Env, _ctx: Context) -> Result<Response> {
     console_error_panic_hook::set_once();
 
+    // Only allow GET method.
+    if !req.method().eq_ignore_ascii_case("GET") {
+        return build_error_response("Method Not Allowed", 405);
+    }
+
     let uri = req.url();
     let uri = fluent_uri::Uri::try_from(uri.as_str()).map_err(|e| {
         io::Error::new(
