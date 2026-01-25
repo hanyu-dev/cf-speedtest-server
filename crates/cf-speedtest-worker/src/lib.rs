@@ -34,9 +34,6 @@ async fn fetch(req: Request, _env: Env, _ctx: Context) -> Result<Response> {
         )
     })?;
 
-    // Currently we don't use the path.
-    let _path = uri.path().as_str().trim_start_matches(WORKER_ROUTE_PREFIX);
-
     let query = uri
         .query()
         .iter()
@@ -55,6 +52,29 @@ async fn fetch(req: Request, _env: Env, _ctx: Context) -> Result<Response> {
         .get("bytes")
         .flatten_ref()
         .and_then(|v| v.parse().ok())
+        .or_else(|| {
+            let bytes = uri
+                .path()
+                .as_str()
+                .trim_start_matches(WORKER_ROUTE_PREFIX)
+                .trim_start_matches("/")
+                .trim_end_matches(".test");
+
+            let offset = bytes.rfind(|c: char| c.is_numeric())? + 1;
+            let base: u64 = (&bytes[..offset]).parse().ok()?;
+            let unit: u64 = match &bytes[offset..] {
+                unit if unit.is_empty() || unit.eq_ignore_ascii_case("B") => 1,
+                unit if unit.eq_ignore_ascii_case("KB") => 1000,
+                unit if unit.eq_ignore_ascii_case("KiB") => 1024,
+                unit if unit.eq_ignore_ascii_case("MB") => 1000 * 1000,
+                unit if unit.eq_ignore_ascii_case("MiB") => 1024 * 1024,
+                unit if unit.eq_ignore_ascii_case("GB") => 1000 * 1000 * 1000,
+                unit if unit.eq_ignore_ascii_case("GiB") => 1024 * 1024 * 1024,
+                _ => return None,
+            };
+
+            NonZeroU64::new(base * unit)
+        })
         .unwrap_or(DEFAULT_BYTES)
         .min(MAX_BYTES);
 
@@ -96,4 +116,16 @@ thread_local! {
 
         init
     }
+}
+
+fn build_error_response(message: &str, status: u16) -> Result<Response> {
+    let headers = Headers::new().expect("Failed to create headers");
+
+    headers.append("x-server", cf_speedtest_core::VERSION)?;
+
+    let init = ResponseInit::new();
+    init.set_status(status);
+    init.set_headers(&headers);
+
+    Response::new_with_opt_str_and_init(Some(message), &init).map_err(Into::into)
 }
