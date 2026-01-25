@@ -132,6 +132,7 @@ version = "0.3.0-dev.0"
 dependencies = [
  "cf-speedtest-core",
  "console_error_panic_hook",
+ "constcat",
  "fluent-uri",
  "foldhash 0.2.0",
  "worker",
@@ -163,6 +164,12 @@ dependencies = [
  "cfg-if",
  "wasm-bindgen",
 ]
+
+[[package]]
+name = "constcat"
+version = "0.6.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "136d3e02915a2cea4d74caa8681e2d44b1c3254bdbf17d11d41d587ff858832c"
 
 [[package]]
 name = "crossbeam-utils"
