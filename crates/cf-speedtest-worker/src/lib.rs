@@ -6,6 +6,7 @@ use std::collections::HashMap;
 use std::io;
 use std::num::NonZeroU64;
 
+use cf_speedtest_core::{DEFAULT_BYTES, MAX_BYTES};
 use worker::js_sys::Uint8Array;
 use worker::web_sys::{Headers, Request, Response, ResponseInit};
 use worker::worker_sys::ext::ResponseInitExt;
@@ -13,14 +14,6 @@ use worker::{Context, Env, Result, event};
 
 /// Route prefix for the speedtest worker.
 const WORKER_ROUTE_PREFIX: &str = "/speedtest";
-
-/// If missing bytes indication, or invalid, assume 200 MiB.
-const DEFAULT_BYTES: NonZeroU64 = NonZeroU64::new(200 * 1024 * 1024).unwrap();
-
-/// Maximum bytes allowed to be requested.
-///
-/// Currently set to 10 GiB.
-const MAX_BYTES: NonZeroU64 = NonZeroU64::new(10 * 1024 * 1024 * 1024).unwrap();
 
 #[event(fetch)]
 async fn fetch(req: Request, _env: Env, _ctx: Context) -> Result<Response> {

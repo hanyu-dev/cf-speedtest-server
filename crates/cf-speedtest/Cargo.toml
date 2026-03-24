@@ -6,12 +6,15 @@ authors.workspace = true
 license.workspace = true
 
 [dependencies]
-axum = { version = "0.7", default-features = false, features = ["http1", "tokio"] }
+axum = { version = "0.8.8", default-features = false, features = ["http1", "tokio"] }
+bytes = "1.11"
 cf-speedtest-core = { path = "../cf-speedtest-core" }
 dashmap = { version = "6.1.0", features = ["inline"] }
-foldhash = "0.1.3"
+fluent-uri = { version = "0.4.1", default-features = false }
+foldhash = "0.2.0"
 macro-toolset = { version = "0.3", default-features = false }
-tokio = { version = "1.41", features = ["macros", "net", "parking_lot", "rt-multi-thread", "signal"] }
+memchr = "2.8.0"
+tokio = { version = "1.50", features = ["macros", "net", "parking_lot", "rt-multi-thread", "signal"] }
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "parking_lot"] }
 

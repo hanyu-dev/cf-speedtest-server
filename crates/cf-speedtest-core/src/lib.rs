@@ -5,6 +5,12 @@ use std::num::NonZeroU64;
 /// `Content-Encoding` header value
 pub const CONTENT_ENCODING: &str = "zstd";
 
+/// If missing bytes indication, or invalid, assume 200 MiB.
+pub const DEFAULT_BYTES: NonZeroU64 = NonZeroU64::new(200 * 1024 * 1024).unwrap();
+
+/// Maximum allowed bytes to be requested.
+pub const MAX_BYTES: NonZeroU64 = NonZeroU64::new(10 * 1024 * 1024 * 1024).unwrap();
+
 /// Server version
 pub static VERSION: &str = include_str!(concat!(env!("OUT_DIR"), "/VERSION"));
 
