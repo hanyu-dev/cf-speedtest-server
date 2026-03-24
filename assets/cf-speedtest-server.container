@@ -1,0 +1,30 @@
+[Unit]
+Description=Cloudflare Speedtest Server
+RequiresMountsFor=%t/containers
+
+[Container]
+# * Specify the name of the container.
+ContainerName=cf-speedtest-server
+# * Specify the container image to use.
+Image=ghcr.io/hanyu-dev/cf-speedtest-server:latest
+# * Automatically pull the latest image.
+AutoUpdate=registry
+# * Change the user namespace mode
+# * Don't modify this field unless you know what you're doing.
+# UserNS=host
+# * Share the network namespace with cloudflared container.
+Network=container:cloudflared
+# * Specify logging level
+Environment=RUST_LOG=debug
+# * Specify listening address for the server.
+# Environment=CF_SPEEDTEST_LISTEN=unix://@cf-speedtest-server.sock
+
+[Service]
+# * Always restart the container if it stops (equivalent to unless-stopped).
+Restart=always
+# * Give the container more time to start.
+TimeoutStartSec=900
+
+[Install]
+# * Enable the service to start at boot.
+WantedBy=default.target

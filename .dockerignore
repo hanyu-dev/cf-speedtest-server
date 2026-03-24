@@ -12,3 +12,6 @@ target
 # Dockerfile
 Dockerfile.*
 .dockerignore
+
+# Others
+assets
