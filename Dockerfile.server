@@ -55,6 +55,10 @@ RUN set -e && \
 
 COPY . .
 
+ARG IMAGE_VCS_REF
+ARG CF_SPEEDTEST_SERVER_CORE_BUILD_SOURCE=image
+ARG CF_SPEEDTEST_SERVER_CORE_BUILD_COMMIT=${IMAGE_VCS_REF}
+
 RUN --mount=type=cache,target=/usr/local/cargo/registry,sharing=locked \
     --mount=type=cache,target=/usr/local/cargo/git,sharing=locked \
     cargo build --release --package cf-speedtest-server --target x86_64-unknown-linux-musl
