@@ -1,0 +1,93 @@
+# Dockerfile for cf-speedtest-server
+
+# Base image
+ARG RUST_BASE_IMAGE=1.94.0-alpine3.23
+
+# Image METADATA
+ARG IMAGE_BUILD_DATE=1970-01-01T00:00:00+00:00
+ARG IMAGE_VCS_REF=00000000
+
+# The version of `cf-speedtest-server`
+ARG VERSION="0.0.0"
+
+# Non-root user and group IDs
+ARG UID=65532
+ARG GID=65532
+
+# Proxy settings
+ARG http_proxy=""
+ARG https_proxy=""
+
+FROM rust:${RUST_BASE_IMAGE} AS chef
+
+ARG http_proxy
+ARG https_proxy
+
+RUN cargo install cargo-chef --locked
+
+WORKDIR /app
+
+FROM chef AS planner
+
+ARG http_proxy
+ARG https_proxy
+
+COPY . .
+
+RUN --mount=type=cache,target=/usr/local/cargo/registry,sharing=locked \
+    --mount=type=cache,target=/usr/local/cargo/git,sharing=locked \
+    cargo chef prepare --recipe-path recipe.json
+
+FROM chef as builder
+
+ARG http_proxy
+ARG https_proxy
+
+COPY --from=planner /app/recipe.json recipe.json
+
+RUN --mount=type=cache,target=/usr/local/cargo/registry,sharing=locked \
+    --mount=type=cache,target=/usr/local/cargo/git,sharing=locked \
+    cargo chef cook --release --recipe-path recipe.json
+
+RUN set -e && \
+    apk --no-cache add \
+    git=2.52.0-r0
+
+COPY . .
+
+RUN --mount=type=cache,target=/usr/local/cargo/registry,sharing=locked \
+    --mount=type=cache,target=/usr/local/cargo/git,sharing=locked \
+    cargo build --release --package cf-speedtest-server --target x86_64-unknown-linux-musl
+
+FROM scratch
+
+ARG IMAGE_BUILD_DATE
+ARG IMAGE_VCS_REF
+
+ARG VERSION
+
+ARG UID
+ARG GID
+
+# OCI labels for image metadata
+LABEL description="Distroless Image for cf-speedtest-server" \
+    org.opencontainers.image.created=${IMAGE_BUILD_DATE} \
+    org.opencontainers.image.authors="Hantong Chen <public-service@7rs.net>" \
+    org.opencontainers.image.url="https://github.com/hanyu-dev/cf-speedtest-server" \
+    org.opencontainers.image.documentation="https://github.com/hanyu-dev/cf-speedtest-server/blob/main/README.md" \
+    org.opencontainers.image.source="https://github.com/hanyu-dev/cf-speedtest-server" \
+    org.opencontainers.image.version=${VERSION}+image.${IMAGE_VCS_REF} \
+    org.opencontainers.image.vendor="Hantong Chen" \
+    org.opencontainers.image.licenses="Apache-2.0" \
+    org.opencontainers.image.title="Distroless Image for cf-speedtest-server" \
+    org.opencontainers.image.description="Distroless Image for cf-speedtest-server"
+
+COPY --from=builder --chown="${UID}:${GID}" --chmod=775 /app/target/x86_64-unknown-linux-musl/release/cf-speedtest-server /opt/cf-speedtest-server/cf-speedtest-server
+
+WORKDIR /opt/cf-speedtest-server
+
+STOPSIGNAL SIGQUIT
+
+USER ${UID}:${GID}
+
+ENTRYPOINT ["/opt/cf-speedtest-server/cf-speedtest-server"]

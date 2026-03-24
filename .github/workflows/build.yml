@@ -1,0 +1,68 @@
+name: CI Build
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+  DOCKER_BUILDX_VERSION: "0.32.1"
+  DOCKER_BUILDKIT_VERSION: "0.28.0"
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+          fetch-tags: true
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+        with:
+          version: v${{ env.DOCKER_BUILDX_VERSION }}
+          driver-opts: image=moby/buildkit:v${{ env.DOCKER_BUILDKIT_VERSION }}-rootless
+
+      - name: Generate build date
+        id: date
+        run: |
+          echo "IMAGE_BUILD_DATE=$(date -u +'%Y-%m-%dT%H:%M:%S')" >> $GITHUB_ENV
+          echo "IMAGE_VCS_REF=$(git rev-parse --short=8 HEAD)" >> $GITHUB_ENV
+          echo "VERSION=$(git describe --tags --abbrev=0 | sed 's/^v//')" >> $GITHUB_ENV
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v4
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push
+        uses: docker/build-push-action@v7
+        env:
+          DOCKER_BUILD_RECORD_UPLOAD: false
+          DOCKER_BUILD_CHECKS_ANNOTATIONS: false
+          DOCKER_CONTENT_TRUST: 1
+        with:
+          provenance: false
+          context: .
+          file: ./Dockerfile.server
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ env.VERSION }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          build-args: |
+            IMAGE_BUILD_DATE=${{ env.IMAGE_BUILD_DATE }}
+            IMAGE_VCS_REF=${{ env.IMAGE_VCS_REF }}
+            VERSION=${{ env.VERSION }}
