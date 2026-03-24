@@ -164,13 +164,13 @@ static CACHED_ZEROS: LazyLock<HashMap<NonZeroU64, (Parts, Bytes), foldhash::fast
         }
 
         [
-            nonzero!(50 * 1024 * 1024),
-            nonzero!(100 * 1024 * 1024),
-            nonzero!(200 * 1024 * 1024),
-            nonzero!(300 * 1024 * 1024),
-            nonzero!(500 * 1024 * 1024),
-            nonzero!(1024 * 1024 * 1024),
-            nonzero!(10 * 1024 * 1024 * 1024),
+            nonzero!(50u64 * 1024 * 1024),
+            nonzero!(100u64 * 1024 * 1024),
+            nonzero!(200u64 * 1024 * 1024),
+            nonzero!(300u64 * 1024 * 1024),
+            nonzero!(500u64 * 1024 * 1024),
+            nonzero!(1024u64 * 1024 * 1024),
+            nonzero!(10u64 * 1024 * 1024 * 1024),
         ]
         .into_iter()
         .map(|b| {
