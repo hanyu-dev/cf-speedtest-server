@@ -130,7 +130,7 @@ fn zeros(body: impl Into<Body>) -> Response {
     *response.headers_mut() = [
         (
             CACHE_CONTROL,
-            HeaderValue::from_static("public, max-age=31536000"),
+            HeaderValue::from_static("public, s-maxage=31536000, max-age=0"),
         ),
         (
             CONTENT_TYPE,
