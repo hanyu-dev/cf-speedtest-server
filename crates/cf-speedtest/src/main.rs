@@ -7,7 +7,7 @@ use std::env;
 
 use axum::body::Body;
 use axum::extract::Request;
-use axum::http::header::{CACHE_CONTROL, CONTENT_ENCODING, CONTENT_TYPE};
+use axum::http::header::{ACCEPT_ENCODING, CACHE_CONTROL, CONTENT_ENCODING, CONTENT_TYPE};
 use axum::http::response::Parts;
 use axum::http::{HeaderName, HeaderValue, StatusCode};
 use axum::response::Response;
@@ -15,28 +15,48 @@ use axum::routing::get;
 use bytes::Bytes;
 use cf_speedtest_core::{DEFAULT_BYTES, MAX_BYTES};
 use dashmap::DashMap;
-use macro_toolset::init_tracing_simple;
+use fastrace_axum::FastraceLayer;
 use memchr::{Memchr, memchr};
 use tokio::net::TcpListener;
 
-// // Mimalloc
 // #[global_allocator]
 // static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
 
-const LISTEN_ADDR_ENV: &str = "CF_SPEEDTEST_LISTEN";
-const LISTEN_ADDR_DEFAULT: SocketAddr =
+const LISTENING_ADDR_ENV: &str = "CF_SPEEDTEST_LISTEN";
+const LISTENING_ADDR_DEFAULT: SocketAddr =
     SocketAddr::new(IpAddr::V4(Ipv4Addr::new(0, 0, 0, 0)), 8000);
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    init_tracing_simple!();
+    // fastrace::set_reporter(
+    //     fastrace::collector::ConsoleReporter,
+    //     fastrace::collector::Config::default(),
+    // );
 
-    tracing::info!("Starting server, version: {}", cf_speedtest_core::VERSION);
+    {
+        use logforth::append::{FastraceEvent, Stdout};
+        use logforth::filter::env_filter::EnvFilterBuilder;
+        use logforth::layout::TextLayout;
 
-    let listen: SocketAddr = env::var(LISTEN_ADDR_ENV)
-        .unwrap_or_default()
-        .parse()
-        .unwrap_or(LISTEN_ADDR_DEFAULT);
+        logforth::bridge::log::setup();
+        logforth::core::builder()
+            .dispatch(|d| {
+                d.filter(EnvFilterBuilder::from_env_or("CF_SPEEDTEST_LOG", "debug").build())
+                    .append(Stdout::default().with_layout(TextLayout::default()))
+            })
+            .dispatch(|d| d.append(FastraceEvent::default()))
+            .apply();
+    }
+
+    let listen = env::var(LISTENING_ADDR_ENV).map_or_else(
+        |_| Ok(LISTENING_ADDR_DEFAULT),
+        |val| {
+            val.parse()
+                .inspect_err(|_| log::error!("invalid address: {val}"))
+        },
+    )?;
+
+    log::info!("Listening on {listen}... Press Ctrl+C to stop.");
 
     let _ = axum::serve(
         TcpListener::bind(listen).await?,
@@ -53,10 +73,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     .head(async || status(StatusCode::OK))
                     .fallback(async || status(StatusCode::METHOD_NOT_ALLOWED)),
             )
-            .fallback(async || status(StatusCode::NOT_FOUND)),
+            .fallback(async || status(StatusCode::NOT_FOUND))
+            .layer(FastraceLayer::default()),
     )
     .with_graceful_shutdown(shutdown_signal())
     .await;
+
+    fastrace::flush();
 
     Ok(())
 }
@@ -75,7 +98,7 @@ async fn shutdown_signal() {
     tokio::select! {
         _ = tokio::signal::ctrl_c() => {}
         _ = hangup => {
-            tracing::info!("Received SIGHUP");
+            log::info!("Received SIGHUP");
         }
     }
 }
@@ -130,16 +153,14 @@ fn zeros(body: impl Into<Body>) -> Response {
     response
 }
 
-#[inline(always)]
+#[fastrace::trace(enter_on_poll = true)]
 async fn handler(request: Request) -> Response {
-    tracing::debug!("Accepted request.");
-
     // Reject requests with `zstd` content encoding, as Cloudflare will have our
     // compressed response returned immediately to the client without decompressing
     // it.
     if request
         .headers()
-        .get(CONTENT_ENCODING)
+        .get(ACCEPT_ENCODING)
         .is_some_and(|encoding| memchr::memmem::find(encoding.as_bytes(), b"zstd").is_some())
     {
         return status(StatusCode::BAD_REQUEST);
@@ -195,16 +216,20 @@ async fn handler(request: Request) -> Response {
         .unwrap_or(DEFAULT_BYTES)
         .min(MAX_BYTES);
 
-    tracing::debug!("Requesting {bytes} bytes.");
+    log::debug!("The client is requesting {bytes} bytes.");
 
     let response = match CACHE.try_with(|cache| {
         cache.get(&bytes).map(|cache| {
+            log::debug!("cache hit (bytes={bytes})");
+
             let (parts, body) = cache.value();
             Response::from_parts(parts.clone(), Body::from(body.clone()))
         })
     }) {
         Ok(Some(response)) => response,
         _ => {
+            log::debug!("cache miss (bytes={bytes})");
+
             let body = Bytes::from(cf_speedtest_core::zeros(bytes));
 
             let (parts, opaque) = zeros(body.clone()).into_parts();
