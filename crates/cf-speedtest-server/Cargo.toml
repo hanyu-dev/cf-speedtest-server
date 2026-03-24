@@ -1,5 +1,5 @@
 [package]
-name = "cf-speedtest"
+name = "cf-speedtest-server"
 version.workspace = true
 edition.workspace = true
 authors.workspace = true
