@@ -1,11 +1,10 @@
 //! Binary entrypoint for the cf-speedtest-v2 project.
 
-use core::iter;
-use core::net::{IpAddr, Ipv4Addr, SocketAddr};
-use core::num::NonZeroU64;
 use std::collections::HashMap;
-use std::env;
+use std::net::{IpAddr, Ipv4Addr, SocketAddr};
+use std::num::NonZeroU64;
 use std::sync::LazyLock;
+use std::{env, iter};
 
 use axum::body::Body;
 use axum::extract::Request;
@@ -151,14 +150,8 @@ fn zeros(body: impl Into<Body>) -> Response {
     response
 }
 
-static CACHE: LazyLock<Cache> = LazyLock::new(Cache::default);
-
-struct Cache {
-    cached: HashMap<NonZeroU64, (Parts, Bytes), foldhash::fast::RandomState>,
-}
-
-impl Default for Cache {
-    fn default() -> Self {
+static CACHED_ZEROS: LazyLock<HashMap<NonZeroU64, (Parts, Bytes), foldhash::fast::RandomState>> =
+    LazyLock::new(|| {
         macro_rules! nonzero {
             ($val:expr) => {{
                 debug_assert!($val > 0, "value must be greater than zero");
@@ -170,28 +163,25 @@ impl Default for Cache {
             }};
         }
 
-        Self {
-            cached: [
-                nonzero!(50 * 1024 * 1024),
-                nonzero!(100 * 1024 * 1024),
-                nonzero!(200 * 1024 * 1024),
-                nonzero!(300 * 1024 * 1024),
-                nonzero!(500 * 1024 * 1024),
-                nonzero!(1024 * 1024 * 1024),
-                nonzero!(10 * 1024 * 1024 * 1024),
-            ]
-            .into_iter()
-            .map(|b| {
-                let bytes = Bytes::from(cf_speedtest_server_core::zeros(b));
+        [
+            nonzero!(50 * 1024 * 1024),
+            nonzero!(100 * 1024 * 1024),
+            nonzero!(200 * 1024 * 1024),
+            nonzero!(300 * 1024 * 1024),
+            nonzero!(500 * 1024 * 1024),
+            nonzero!(1024 * 1024 * 1024),
+            nonzero!(10 * 1024 * 1024 * 1024),
+        ]
+        .into_iter()
+        .map(|b| {
+            let bytes = Bytes::from(cf_speedtest_server_core::zeros(b));
 
-                let (parts, _) = zeros(bytes.clone()).into_parts();
+            let (parts, _) = zeros(bytes.clone()).into_parts();
 
-                (b, (parts, bytes))
-            })
-            .collect(),
-        }
-    }
-}
+            (b, (parts, bytes))
+        })
+        .collect()
+    });
 
 #[fastrace::trace(enter_on_poll = true)]
 async fn handler(request: Request) -> Response {
@@ -260,9 +250,8 @@ async fn handler(request: Request) -> Response {
 
     log::debug!("The client requests {bytes} bytes.");
 
-    CACHE
-        .cached
-        .get(&bytes)
-        .map(|(parts, bytes)| Response::from_parts(parts.clone(), Body::from(bytes.clone())))
-        .unwrap_or_else(|| zeros(Bytes::from(cf_speedtest_server_core::zeros(bytes))))
+    CACHED_ZEROS.get(&bytes).map_or_else(
+        || zeros(Bytes::from(cf_speedtest_server_core::zeros(bytes))),
+        |(parts, bytes)| Response::from_parts(parts.clone(), Body::from(bytes.clone())),
+    )
 }
