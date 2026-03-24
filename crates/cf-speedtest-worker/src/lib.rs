@@ -1,12 +1,10 @@
 //! WASM binary for Cloudflare Workers deployment.
 
-#![feature(option_reference_flattening)]
-
-use std::collections::HashMap;
 use std::io;
 use std::num::NonZeroU64;
 
 use cf_speedtest_core::{DEFAULT_BYTES, MAX_BYTES};
+use fluent_uri::Uri;
 use worker::js_sys::Uint8Array;
 use worker::web_sys::{Headers, Request, Response, ResponseInit};
 use worker::worker_sys::ext::ResponseInitExt;
@@ -32,32 +30,37 @@ async fn fetch(req: Request, _env: Env, _ctx: Context) -> Result<Response> {
         }
     }
 
-    let uri = req.url();
-    let uri = fluent_uri::Uri::try_from(uri.as_str()).map_err(|e| {
+    let url = req.url();
+    let uri = Uri::try_from(url.as_str()).map_err(|e| {
         io::Error::new(
             io::ErrorKind::InvalidInput,
-            format!("invalid uri `{uri}`: {e}"),
+            format!("invalid url `{url}`: {e}"),
         )
     })?;
 
-    let query = uri
+    let bytes = uri
         .query()
         .iter()
         .flat_map(|query| query.as_str().split('&'))
-        .flat_map(|pair| {
+        .find_map(|pair| {
             let mut split = pair.split('=');
 
-            let k = split.next()?;
-            let v = split.next();
+            let Some(k) = split.next() else {
+                return None;
+            };
 
-            Some((k, v))
+            if k != "bytes" {
+                return None;
+            }
+
+            Some(
+                split
+                    .next()
+                    .unwrap_or_default()
+                    .parse()
+                    .unwrap_or(DEFAULT_BYTES),
+            )
         })
-        .collect::<HashMap<_, _, foldhash::fast::RandomState>>();
-
-    let bytes = query
-        .get("bytes")
-        .flatten_ref()
-        .and_then(|v| v.parse().ok())
         .or_else(|| {
             let bytes = uri
                 .path()
@@ -108,6 +111,9 @@ thread_local! {
             .append("x-server", cf_speedtest_core::VERSION)
             .expect("Failed to append `x-server` header");
         headers
+            .append("cache-control", "public, s-maxage=31536000, max-age=0")
+            .expect("Failed to append `cache-control` header");
+        headers
             .append("content-type", "application/octet-stream")
             .expect("Failed to append `content-type` header");
         headers
@@ -128,6 +134,9 @@ fn build_general_response(message: Option<&str>, status: u16) -> Result<Response
     let headers = Headers::new().expect("Failed to create headers");
 
     headers.append("x-server", cf_speedtest_core::VERSION)?;
+    headers
+        .append("cache-control", "public, s-maxage=31536000, max-age=0")
+        .expect("Failed to append `cache-control` header");
 
     let init = ResponseInit::new();
     init.set_status(status);
