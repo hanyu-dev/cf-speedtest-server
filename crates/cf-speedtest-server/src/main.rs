@@ -25,7 +25,7 @@ use tokio::net::TcpListener;
 
 const LISTENING_ADDR_ENV: &str = "CF_SPEEDTEST_LISTEN";
 const LISTENING_ADDR_DEFAULT: SocketAddr =
-    SocketAddr::new(IpAddr::V4(Ipv4Addr::new(0, 0, 0, 0)), 8000);
+    SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 1585);
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
