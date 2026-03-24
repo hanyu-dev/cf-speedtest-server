@@ -3,7 +3,9 @@
 use core::iter;
 use core::net::{IpAddr, Ipv4Addr, SocketAddr};
 use core::num::NonZeroU64;
+use std::collections::HashMap;
 use std::env;
+use std::sync::LazyLock;
 
 use axum::body::Body;
 use axum::extract::Request;
@@ -14,7 +16,6 @@ use axum::response::Response;
 use axum::routing::get;
 use bytes::Bytes;
 use cf_speedtest_core::{DEFAULT_BYTES, MAX_BYTES};
-use dashmap::DashMap;
 use fastrace_axum::FastraceLayer;
 use memchr::{Memchr, memchr};
 use tokio::net::TcpListener;
@@ -64,16 +65,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             .route(
                 "/speedtest",
                 get(handler)
-                    .head(async || status(StatusCode::OK))
-                    .fallback(async || status(StatusCode::METHOD_NOT_ALLOWED)),
+                    .head(async || status(StatusCode::OK, None))
+                    .fallback(async || status(StatusCode::METHOD_NOT_ALLOWED, None)),
             )
             .route(
                 "/speedtest/",
                 get(handler)
-                    .head(async || status(StatusCode::OK))
-                    .fallback(async || status(StatusCode::METHOD_NOT_ALLOWED)),
+                    .head(async || status(StatusCode::OK, None))
+                    .fallback(async || status(StatusCode::METHOD_NOT_ALLOWED, None)),
             )
-            .fallback(async || status(StatusCode::NOT_FOUND))
+            .fallback(async || status(StatusCode::NOT_FOUND, None))
             .layer(FastraceLayer::default()),
     )
     .with_graceful_shutdown(shutdown_signal())
@@ -103,13 +104,9 @@ async fn shutdown_signal() {
     }
 }
 
-thread_local! {
-    static CACHE: DashMap<NonZeroU64, (Parts, Bytes), foldhash::fast::RandomState> = DashMap::default();
-}
-
 #[inline]
-fn status(status: StatusCode) -> Response {
-    let mut response = Response::new(Body::empty());
+fn status(status: StatusCode, body: Option<&'static str>) -> Response {
+    let mut response = Response::new(body.map(Into::into).unwrap_or_else(Body::empty));
 
     *response.status_mut() = status;
 
@@ -126,6 +123,7 @@ fn status(status: StatusCode) -> Response {
     response
 }
 
+#[inline]
 fn zeros(body: impl Into<Body>) -> Response {
     let mut response = Response::new(body.into());
 
@@ -153,17 +151,61 @@ fn zeros(body: impl Into<Body>) -> Response {
     response
 }
 
+static CACHE: LazyLock<Cache> = LazyLock::new(Cache::default);
+
+struct Cache {
+    cached: HashMap<NonZeroU64, (Parts, Bytes), foldhash::fast::RandomState>,
+}
+
+impl Default for Cache {
+    fn default() -> Self {
+        macro_rules! nonzero {
+            ($val:expr) => {{
+                debug_assert!($val > 0, "value must be greater than zero");
+
+                #[allow(unsafe_code, reason = "XXX")]
+                unsafe {
+                    NonZeroU64::new_unchecked($val)
+                }
+            }};
+        }
+
+        Self {
+            cached: [
+                nonzero!(50 * 1024 * 1024),
+                nonzero!(100 * 1024 * 1024),
+                nonzero!(200 * 1024 * 1024),
+                nonzero!(300 * 1024 * 1024),
+                nonzero!(500 * 1024 * 1024),
+                nonzero!(1024 * 1024 * 1024),
+                nonzero!(10 * 1024 * 1024 * 1024),
+            ]
+            .into_iter()
+            .map(|b| {
+                let bytes = Bytes::from(cf_speedtest_core::zeros(b));
+
+                let (parts, _) = zeros(bytes.clone()).into_parts();
+
+                (b, (parts, bytes))
+            })
+            .collect(),
+        }
+    }
+}
+
 #[fastrace::trace(enter_on_poll = true)]
 async fn handler(request: Request) -> Response {
-    // Reject requests with `zstd` content encoding, as Cloudflare will have our
-    // compressed response returned immediately to the client without decompressing
-    // it.
+    // Reject requests with `zstd` content encoding, as Cloudflare will deliver our
+    // compressed response directly to the client without decompressing it.
     if request
         .headers()
         .get(ACCEPT_ENCODING)
         .is_some_and(|encoding| memchr::memmem::find(encoding.as_bytes(), b"zstd").is_some())
     {
-        return status(StatusCode::BAD_REQUEST);
+        return status(
+            StatusCode::BAD_REQUEST,
+            Some("FATAL: the client should not accept `zstd` encoding."),
+        );
     }
 
     let bytes = request
@@ -216,33 +258,11 @@ async fn handler(request: Request) -> Response {
         .unwrap_or(DEFAULT_BYTES)
         .min(MAX_BYTES);
 
-    log::debug!("The client is requesting {bytes} bytes.");
+    log::debug!("The client requests {bytes} bytes.");
 
-    let response = match CACHE.try_with(|cache| {
-        cache.get(&bytes).map(|cache| {
-            log::debug!("cache hit (bytes={bytes})");
-
-            let (parts, body) = cache.value();
-            Response::from_parts(parts.clone(), Body::from(body.clone()))
-        })
-    }) {
-        Ok(Some(response)) => response,
-        _ => {
-            log::debug!("cache miss (bytes={bytes})");
-
-            let body = Bytes::from(cf_speedtest_core::zeros(bytes));
-
-            let (parts, opaque) = zeros(body.clone()).into_parts();
-
-            CACHE
-                .try_with(|cache| {
-                    cache.insert(bytes, (parts.clone(), body));
-                })
-                .ok();
-
-            Response::from_parts(parts, opaque)
-        }
-    };
-
-    response
+    CACHE
+        .cached
+        .get(&bytes)
+        .map(|(parts, bytes)| Response::from_parts(parts.clone(), Body::from(bytes.clone())))
+        .unwrap_or_else(|| zeros(Bytes::from(cf_speedtest_core::zeros(bytes))))
 }
