@@ -15,7 +15,7 @@ use axum::http::{HeaderName, HeaderValue, StatusCode};
 use axum::response::Response;
 use axum::routing::get;
 use bytes::Bytes;
-use cf_speedtest_core::{DEFAULT_BYTES, MAX_BYTES};
+use cf_speedtest_server_core::{DEFAULT_BYTES, MAX_BYTES};
 use fastrace_axum::FastraceLayer;
 use memchr::{Memchr, memchr};
 use tokio::net::TcpListener;
@@ -114,7 +114,7 @@ fn status(status: StatusCode, body: Option<&'static str>) -> Response {
         (CONTENT_TYPE, HeaderValue::from_static("text/plain")),
         (
             HeaderName::from_static("x-server"),
-            HeaderValue::from_static(cf_speedtest_core::VERSION),
+            HeaderValue::from_static(cf_speedtest_server_core::VERSION),
         ),
     ]
     .into_iter()
@@ -138,11 +138,11 @@ fn zeros(body: impl Into<Body>) -> Response {
         ),
         (
             CONTENT_ENCODING,
-            HeaderValue::from_static(cf_speedtest_core::CONTENT_ENCODING),
+            HeaderValue::from_static(cf_speedtest_server_core::CONTENT_ENCODING),
         ),
         (
             HeaderName::from_static("x-server"),
-            HeaderValue::from_static(cf_speedtest_core::VERSION),
+            HeaderValue::from_static(cf_speedtest_server_core::VERSION),
         ),
     ]
     .into_iter()
@@ -182,7 +182,7 @@ impl Default for Cache {
             ]
             .into_iter()
             .map(|b| {
-                let bytes = Bytes::from(cf_speedtest_core::zeros(b));
+                let bytes = Bytes::from(cf_speedtest_server_core::zeros(b));
 
                 let (parts, _) = zeros(bytes.clone()).into_parts();
 
@@ -264,5 +264,5 @@ async fn handler(request: Request) -> Response {
         .cached
         .get(&bytes)
         .map(|(parts, bytes)| Response::from_parts(parts.clone(), Body::from(bytes.clone())))
-        .unwrap_or_else(|| zeros(Bytes::from(cf_speedtest_core::zeros(bytes))))
+        .unwrap_or_else(|| zeros(Bytes::from(cf_speedtest_server_core::zeros(bytes))))
 }

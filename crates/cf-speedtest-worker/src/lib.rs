@@ -3,7 +3,7 @@
 use std::io;
 use std::num::NonZeroU64;
 
-use cf_speedtest_core::{DEFAULT_BYTES, MAX_BYTES};
+use cf_speedtest_server_core::{DEFAULT_BYTES, MAX_BYTES};
 use fluent_uri::Uri;
 use worker::js_sys::Uint8Array;
 use worker::web_sys::{Headers, Request, Response, ResponseInit};
@@ -87,7 +87,7 @@ async fn fetch(req: Request, _env: Env, _ctx: Context) -> Result<Response> {
         .unwrap_or(DEFAULT_BYTES)
         .min(MAX_BYTES);
 
-    let body = cf_speedtest_core::zeros(bytes);
+    let body = cf_speedtest_server_core::zeros(bytes);
 
     #[allow(
         unsafe_code,
@@ -108,7 +108,7 @@ thread_local! {
         let headers = Headers::new().expect("Failed to create headers");
 
         headers
-            .append("x-server", cf_speedtest_core::VERSION)
+            .append("x-server", cf_speedtest_server_core::VERSION)
             .expect("Failed to append `x-server` header");
         headers
             .append("cache-control", "public, s-maxage=31536000, max-age=0")
@@ -117,7 +117,7 @@ thread_local! {
             .append("content-type", "application/octet-stream")
             .expect("Failed to append `content-type` header");
         headers
-            .append("content-encoding", cf_speedtest_core::CONTENT_ENCODING)
+            .append("content-encoding", cf_speedtest_server_core::CONTENT_ENCODING)
             .expect("Failed to append `content-encoding` header");
 
         let mut init = ResponseInit::new();
@@ -133,7 +133,7 @@ thread_local! {
 fn build_general_response(message: Option<&str>, status: u16) -> Result<Response> {
     let headers = Headers::new().expect("Failed to create headers");
 
-    headers.append("x-server", cf_speedtest_core::VERSION)?;
+    headers.append("x-server", cf_speedtest_server_core::VERSION)?;
     headers
         .append("cache-control", "public, s-maxage=31536000, max-age=0")
         .expect("Failed to append `cache-control` header");

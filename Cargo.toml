@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["crates/cf-speedtest-core", "crates/cf-speedtest-server", "crates/cf-speedtest-worker"]
+members = ["crates/cf-speedtest-server-core", "crates/cf-speedtest-server", "crates/cf-speedtest-worker"]
 
 [workspace.package]
 version = "0.3.0"

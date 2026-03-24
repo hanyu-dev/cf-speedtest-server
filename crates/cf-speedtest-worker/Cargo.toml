@@ -9,7 +9,7 @@ license.workspace = true
 crate-type = ["lib", "cdylib"]
 
 [dependencies]
-cf-speedtest-core = { path = "../cf-speedtest-core" }
+cf-speedtest-server-core = { path = "../cf-speedtest-server-core" }
 console_error_panic_hook = "0.1.7"
 constcat = "0.6.1"
 fluent-uri = { version = "0.4.1", default-features = false }
