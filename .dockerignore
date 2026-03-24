@@ -3,9 +3,12 @@
 build
 node_modules
 
+# Github
+.github
+
 # Rust build target
 target
 
-# Others
+# Dockerfile
 Dockerfile.*
 .dockerignore
