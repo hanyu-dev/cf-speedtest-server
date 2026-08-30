@@ -1,0 +1,3 @@
+[registries.hanyu]
+# Testing, not published yet.
+index = "sparse+https://git.7rs.net/api/packages/Hanyu/cargo/"

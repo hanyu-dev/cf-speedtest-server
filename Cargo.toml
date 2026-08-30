@@ -1,12 +1,11 @@
 [workspace]
 resolver = "3"
-members = ["crates/cf-speedtest-server-core", "crates/cf-speedtest-server", "crates/cf-speedtest-worker"]
+members = ["crates/tespeed", "crates/tespeed-bin", "crates/tespeed-worker"]
 
 [workspace.package]
-version = "0.3.1"
 edition = "2024"
-authors = ["Hantong Chen <cxwdyx620@gmail.com>"]
-license = "MIT"
+rust-version = "1.98.0"
+license = "MIT OR Apache-2.0"
 
 [workspace.lints]
 clippy.allow_attributes_without_reason = "warn"
@@ -39,22 +38,27 @@ clippy.unimplemented = "warn"
 clippy.unreachable = "warn"
 clippy.wildcard_dependencies = "deny"
 clippy.wildcard_imports = "warn"
-rust.unsafe_code = "warn"
-rust.missing_docs = "warn"
 rust.missing_debug_implementations = "warn"
+rust.missing_docs = "warn"
 rust.unreachable_pub = "warn"
+rust.unsafe_code = "warn"
+
+[profile.dev]
+debug = "line-tables-only"
 
 [profile.release]
 opt-level = 3
-lto = true
-codegen-units = 1
-incremental = false
 strip = true
+lto = true
 panic = "unwind"
+incremental = false
+codegen-units = 1
 
-[profile.release-wasm]
+[profile.release-panic-abort]
 inherits = "release"
 opt-level = 3
+strip = true
 lto = true
-codegen-units = 1
 panic = "abort"
+incremental = false
+codegen-units = 1

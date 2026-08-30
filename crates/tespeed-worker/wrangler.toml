@@ -1,6 +1,6 @@
 name = "cf-speedtest-worker"
 main = "build/index.js"
-compatibility_date = "2026-01-24"
+compatibility_date = "2026-08-30"
 
 # Disable `workers.dev` domain
 workers_dev = false
@@ -10,4 +10,4 @@ enabled = true
 head_sampling_rate = 1
 
 [build]
-command = "RUSTFLAGS=\"-Zfmt-debug=none -Zfmt-debug=none\" worker-build --profile release-wasm"
+command = "RUSTFLAGS=\"-Zfmt-debug=none -Zfmt-debug=none\" worker-build --profile release-panic-abort"

@@ -3,8 +3,8 @@
 use std::io;
 use std::num::NonZeroU64;
 
-use cf_speedtest_server_core::{DEFAULT_BYTES, MAX_BYTES};
 use fluent_uri::Uri;
+use tespeed::DecompressionBomb;
 use worker::js_sys::Uint8Array;
 use worker::web_sys::{Headers, Request, Response, ResponseInit};
 use worker::worker_sys::ext::ResponseInitExt;
@@ -23,14 +23,15 @@ async fn fetch(req: Request, _env: Env, _ctx: Context) -> Result<Response> {
             // OK, Do nothing.
         }
         method if method.eq_ignore_ascii_case("HEAD") => {
-            return build_general_response(None, 200);
+            return status(200, None);
         }
         _ => {
-            return build_general_response(None, 405);
+            return status(405, None);
         }
     }
 
     let url = req.url();
+
     let uri = Uri::try_from(url.as_str()).map_err(|e| {
         io::Error::new(
             io::ErrorKind::InvalidInput,
@@ -49,17 +50,11 @@ async fn fetch(req: Request, _env: Env, _ctx: Context) -> Result<Response> {
                 return None;
             };
 
-            if k != "bytes" {
+            if !k.eq_ignore_ascii_case("bytes") {
                 return None;
             }
 
-            Some(
-                split
-                    .next()
-                    .unwrap_or_default()
-                    .parse()
-                    .unwrap_or(DEFAULT_BYTES),
-            )
+            split.next().and_then(|v| v.parse::<NonZeroU64>().ok())
         })
         .or_else(|| {
             let bytes = uri
@@ -84,10 +79,11 @@ async fn fetch(req: Request, _env: Env, _ctx: Context) -> Result<Response> {
 
             NonZeroU64::new(base * unit)
         })
-        .unwrap_or(DEFAULT_BYTES)
-        .min(MAX_BYTES);
+        .map_or_else(DecompressionBomb::default, |size| {
+            DecompressionBomb::new(size).unwrap_or_default()
+        });
 
-    let body = cf_speedtest_server_core::zeros(bytes);
+    let body = bytes.zstd();
 
     #[allow(
         unsafe_code,
@@ -108,7 +104,7 @@ thread_local! {
         let headers = Headers::new().expect("Failed to create headers");
 
         headers
-            .append("x-server", cf_speedtest_server_core::VERSION)
+            .append("x-server", env!("CARGO_PKG_VERSION"))
             .expect("Failed to append `x-server` header");
         headers
             .append("cache-control", "public, s-maxage=31536000, max-age=0")
@@ -117,10 +113,11 @@ thread_local! {
             .append("content-type", "application/octet-stream")
             .expect("Failed to append `content-type` header");
         headers
-            .append("content-encoding", cf_speedtest_server_core::CONTENT_ENCODING)
+            .append("content-encoding", "zstd")
             .expect("Failed to append `content-encoding` header");
 
         let mut init = ResponseInit::new();
+
         init.set_status(200);
         init.set_headers(&headers);
         init.encode_body("manual")
@@ -130,10 +127,10 @@ thread_local! {
     }
 }
 
-fn build_general_response(message: Option<&str>, status: u16) -> Result<Response> {
+fn status(status: u16, message: Option<&str>) -> Result<Response> {
     let headers = Headers::new().expect("Failed to create headers");
 
-    headers.append("x-server", cf_speedtest_server_core::VERSION)?;
+    headers.append("x-server", env!("CARGO_PKG_VERSION"))?;
     headers
         .append("cache-control", "public, s-maxage=31536000, max-age=0")
         .expect("Failed to append `cache-control` header");

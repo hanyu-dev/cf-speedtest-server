@@ -1,0 +1,6 @@
+ARG IMAGE_BUILDAH_VERSION
+ARG IMAGE_BUILDAH_DIGEST
+
+FROM quay.io/buildah/stable:v${IMAGE_BUILDAH_VERSION}@sha256:${IMAGE_BUILDAH_DIGEST}
+
+RUN dnf install cargo jq -y

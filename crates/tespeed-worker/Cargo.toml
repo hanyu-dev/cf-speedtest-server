@@ -1,0 +1,18 @@
+[package]
+name = "tespeed-worker"
+version = "0.4.0-dev.0"
+edition = { workspace = true }
+rust-version = { workspace = true }
+license = { workspace = true }
+
+[lib]
+crate-type = ["cdylib", "lib"]
+
+[dependencies]
+console_error_panic_hook = "0.1.7"
+fluent-uri = { version = "0.4.1", default-features = false }
+tespeed = { path = "../tespeed", version = "0.4.0-dev.0" }
+worker = "0.8.5"
+
+[lints]
+workspace = true

@@ -1,0 +1,36 @@
+[Unit]
+Description=Cloudflare Speedtest Server
+RequiresMountsFor=%t/containers
+
+[Container]
+# ================================
+# * Basic settings
+# ================================
+ContainerName=tespeed
+Image=ghcr.io/hanyu-dev/tespeed:0.4
+AutoUpdate=registry
+
+# ================================
+# * Security settings
+# ================================
+NoNewPrivileges=true
+DropCapability=ALL
+
+# ================================
+# * Network settings
+# ================================
+# Network=container-br0.network
+# PublishPort=1585:1585
+
+# ================================
+# * Application settings
+# ================================
+Environment=RUST_LOG=debug
+# Exec=-l 0.0.0.0:1585
+
+[Service]
+Restart=always
+TimeoutStartSec=900
+
+[Install]
+WantedBy=default.target
